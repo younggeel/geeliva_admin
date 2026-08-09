@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.geeliva_cm.customer",
+      "sha256_cert_fingerprints": [
+        "99:5B:2A:6D:03:91:7C:59:82:A5:5A:4D:78:06:4B:82:1E:56:CC:56:47:BF:6C:D0:37:F9:85:E4:C1:D9:39:29"
+      ]
+    }
+  }
+]
