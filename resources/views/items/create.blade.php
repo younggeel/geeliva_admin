@@ -174,6 +174,19 @@
                                 <label class="col-3 control-label"
                                     for="item_take_away_option">{{ trans('lang.item_take_away') }}</label>
                             </div>
+                            <div class="form-group row width-100 food_delivery_take_away d-none">
+                                <label class="col-3 control-label" for="item_pack_option">Packaging</label>
+                                <div class="col-7">
+                                    <select class="form-control" id="item_pack_option">
+                                        <option value="">Store default (not set)</option>
+                                        <option value="none">No packaging</option>
+                                        <option value="free">Free option only (e.g. plastic wrap)</option>
+                                        <option value="paid">Paid option only (e.g. bowl)</option>
+                                        <option value="both">Customer chooses free or paid</option>
+                                    </select>
+                                    <div class="form-text text-muted">Prices and option names are set on the store's edit page.</div>
+                                </div>
+                            </div>
                         </fieldset>
                         <fieldset class="food_delivery_div d-none">
                             <legend>{{ trans('lang.ingredients') }}</legend>
@@ -784,6 +797,7 @@
                                 'addOnsTitle': addOnesTitle,
                                 'addOnsPrice': addOnesPrice,
                                 'takeawayOption': itemTakeaway,
+                                'needs_pack': $("#item_pack_option").val() !== 'none',
                                 'product_specification': product_specification,
                                 'id': id,
                                 'item_attribute': item_attribute,
@@ -792,6 +806,9 @@
                                 'digitalProduct': DigitalImg,
                                 'createdAt': firebase.firestore.FieldValue.serverTimestamp()
                             };
+                            if ($("#item_pack_option").val()) {
+                                objects['pack_option'] = $("#item_pack_option").val();
+                            }
                             database.collection('vendor_products').doc(id)
                                 .set(objects).then(function(result) {
                                     if (reataurantIDDirec) {

@@ -2254,6 +2254,36 @@
                     html = html + '<tr><td class="label">{{ trans('lang.tip_amount') }}</td><td class="tip_amount_val" style="color:green">+' + tip_amount_val + '</td></tr>';
                 }
             }
+            // Packaging the customer paid: each dish's free or paid option and the
+            // once-per-order pack. deliveryPackCharge holds their total.
+            var packagingTotal = parseFloat(snapshotsProducts.deliveryPackCharge) || 0;
+            var packaging = snapshotsProducts.packaging;
+            var formatAmount = function(amount) {
+                return currencyAtRight
+                    ? parseFloat(amount).toFixed(decimal_degits) + "" + currentCurrency
+                    : currentCurrency + "" + parseFloat(amount).toFixed(decimal_degits);
+            };
+            var escapeText = function(text) {
+                return $('<div>').text(text == null ? '' : text).html();
+            };
+            if (packaging || snapshotsProducts.deliveryPackType) {
+                html = html + '<tr><td class="seprater" colspan="2"><hr><span>Packaging</span></td></tr>';
+                if (packaging && Array.isArray(packaging.dishes)) {
+                    packaging.dishes.forEach(function(dish) {
+                        var optionName = dish.choice === 'paid' ? packaging.paid_name : packaging.free_name;
+                        var amount = dish.choice === 'paid' ? '+' + formatAmount((parseFloat(dish.unit_price) || 0) * (parseInt(dish.quantity) || 0)) : 'Free';
+                        html = html + '<tr><td class="label">' + escapeText(dish.name) + ' x' + escapeText(dish.quantity) + ': ' + escapeText(optionName) + '</td><td style="color:green">' + amount + '</td></tr>';
+                    });
+                    if ((parseFloat(packaging.pack_charge) || 0) > 0) {
+                        html = html + '<tr><td class="label">Pack</td><td style="color:green">+' + formatAmount(packaging.pack_charge) + '</td></tr>';
+                    }
+                } else {
+                    var packLabel = snapshotsProducts.deliveryPackType === 'paid' ? 'Delivery pack (paid)' : 'Delivery pack (free)';
+                    if (snapshotsProducts.deliveryPackCount) packLabel += ' x' + escapeText(snapshotsProducts.deliveryPackCount);
+                    html = html + '<tr><td class="label">' + packLabel + '</td><td style="color:green">+' + formatAmount(packagingTotal) + '</td></tr>';
+                }
+                totalAmount += packagingTotal;
+            }
             html += '<tr><td class="seprater" colspan="2"><hr></td></tr>';
 
             orderPaytableAmount = totalAmount;

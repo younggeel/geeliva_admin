@@ -468,6 +468,46 @@
                                         </div>
                                     </div>
                                 </fieldset>
+                                <fieldset>
+                                    <legend>Packaging fees</legend>
+                                    <div class="form-group row">
+                                        <div class="form-text text-muted width-100 mb-2">Each dish's packaging (none, free, paid, or customer chooses) is set on the item's edit page. The pack is charged once per delivery or takeaway order; dine-in is never charged.</div>
+                                        <div class="form-group row width-100">
+                                            <label class="col-4 control-label">Free option name</label>
+                                            <div class="col-7">
+                                                <input type="text" class="form-control" id="pack_free_name" placeholder="Plastic wrap">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row width-100">
+                                            <label class="col-4 control-label">Paid option name</label>
+                                            <div class="col-7">
+                                                <input type="text" class="form-control" id="pack_paid_name" placeholder="Bowl">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row width-100">
+                                            <label class="col-4 control-label">Paid option price, per dish</label>
+                                            <div class="col-7">
+                                                <input type="number" min="0" class="form-control" id="pack_bowl_price">
+                                            </div>
+                                        </div>
+                                        <div class="form-check width-100">
+                                            <input type="checkbox" id="pack_enabled">
+                                            <label class="col-3 control-label" for="pack_enabled">Pack / bag, once per order</label>
+                                        </div>
+                                        <div class="form-group row width-100">
+                                            <label class="col-4 control-label">Pack price, delivery orders</label>
+                                            <div class="col-7">
+                                                <input type="number" min="0" class="form-control" id="pack_price_delivery">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row width-100">
+                                            <label class="col-4 control-label">Pack price, takeaway orders</label>
+                                            <div class="col-7">
+                                                <input type="number" min="0" class="form-control" id="pack_price_takeaway">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </fieldset>
                                 <fieldset class="delivery_charges_div">
                                     <legend>{{ trans('lang.deliveryCharge') }}</legend>
 
@@ -823,6 +863,7 @@
     <script type="text/javascript">
 
         var section_id = getCookie('section_id') || null;
+        var loadedDeliveryPack = {};
         var id = "<?php echo $id; ?>";
         var database = firebase.firestore();
         var ref = database.collection('vendors').where("id", "==", id);
@@ -1377,6 +1418,23 @@
                 if (vendor.hasOwnProperty('isSelfDelivery') && vendor.isSelfDelivery != null && vendor.isSelfDelivery != '' && vendor.isSelfDelivery) {
                     $('#enable_self_delivery').prop('checked', true);
                 }
+                // Stores not set up since packaging became per dish get the
+                // fees their first-version settings charged (same rule as the apps).
+                loadedDeliveryPack = vendor.deliveryPack || {};
+                var pack = loadedDeliveryPack;
+                var legacyPaid = pack.paid_enabled === true ? (parseFloat(pack.paid_price) || 0) : 0;
+                var perOrder = pack.charge_mode === 'per_order';
+                var isSetUp = pack.hasOwnProperty('paid_bowl_price');
+                var packOn = isSetUp ? pack.pack_enabled === true : (perOrder && legacyPaid > 0);
+                var bowlPrice = isSetUp ? (parseFloat(pack.paid_bowl_price) || 0) : (perOrder ? 0 : legacyPaid);
+                var packDelivery = isSetUp ? (parseFloat(pack.pack_price_delivery) || 0) : (packOn ? legacyPaid : 0);
+                var packTakeaway = isSetUp ? (parseFloat(pack.pack_price_takeaway) || 0) : packDelivery;
+                $('#pack_free_name').val(pack.free_option_name || '');
+                $('#pack_paid_name').val(pack.paid_option_name || '');
+                $('#pack_bowl_price').val(bowlPrice > 0 ? bowlPrice : '');
+                $('#pack_enabled').prop('checked', packOn);
+                $('#pack_price_delivery').val(packDelivery > 0 ? packDelivery : '');
+                $('#pack_price_takeaway').val(packTakeaway > 0 ? packTakeaway : '');
                 jQuery("#data-table_processing").hide();
             })
 
@@ -1601,7 +1659,26 @@
                     'minimum_delivery_charges': minimum_delivery_charges,
                     'minimum_delivery_charges_within_km': minimum_delivery_charges_within_km
                 };
-                if (vendorname == '') {
+                // The first version's fields stay as saved: older app versions
+                // still charge from them.
+                var packEnabled = $("#pack_enabled").is(':checked');
+                var packDeliveryPrice = parseFloat($("#pack_price_delivery").val()) || 0;
+                var packTakeawayPrice = parseFloat($("#pack_price_takeaway").val()) || 0;
+                var deliveryPack = Object.assign({}, loadedDeliveryPack, {
+                    'free_option_name': $("#pack_free_name").val().trim() || 'Plastic wrap',
+                    'paid_option_name': $("#pack_paid_name").val().trim() || 'Bowl',
+                    'paid_bowl_price': parseFloat($("#pack_bowl_price").val()) || 0,
+                    'pack_enabled': packEnabled,
+                    'pack_price_delivery': packEnabled ? packDeliveryPrice : 0,
+                    'pack_price_takeaway': packEnabled ? packTakeawayPrice : 0
+                });
+                if (packEnabled && packDeliveryPrice <= 0 && packTakeawayPrice <= 0) {
+                    $(".error_top").show();
+                    $(".error_top").html("");
+                    $(".error_top").append("<p>Enter a pack price for delivery or takeaway orders.</p>");
+                    window.scrollTo(0, 0);
+                    jQuery("#data-table_processing").hide();
+                } else if (vendorname == '') {
                     $(".error_top").show();
                     $(".error_top").html("");
                     $(".error_top").append("<p>{{ trans('lang.vendor_name_error') }}</p>");
@@ -1700,6 +1777,7 @@
                                     'workingHours': workingHours,
                                     'adminCommission': adminCommission,
                                     'isSelfDelivery': enable_self_delivery,
+                                    'deliveryPack': deliveryPack,
                                     'zoneId': zoneId,
                                     'top_rated': topRated,
 

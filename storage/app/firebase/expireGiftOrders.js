@@ -120,6 +120,8 @@ function computeTotalPrice(orderData) {
     }
     totalPrice += parseFloat(orderData.deliveryCharge || 0);
     totalPrice += parseFloat(orderData.tip_amount || 0);
+    // Paid bowls and the pack, set by the store at checkout.
+    totalPrice += parseFloat(orderData.deliveryPackCharge || 0);
     return totalPrice;
 }
 

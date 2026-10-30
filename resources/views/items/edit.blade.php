@@ -153,6 +153,19 @@
                                 <input type="checkbox" class="item_take_away_option" id="item_take_away_option">
                                 <label class="col-3 control-label" for="item_take_away_option">{{ trans('lang.item_take_away') }}</label>
                             </div>
+                            <div class="form-group row width-100 food_delivery_take_away d-none">
+                                <label class="col-3 control-label" for="item_pack_option">Packaging</label>
+                                <div class="col-7">
+                                    <select class="form-control" id="item_pack_option">
+                                        <option value="">Store default (not set)</option>
+                                        <option value="none">No packaging</option>
+                                        <option value="free">Free option only (e.g. plastic wrap)</option>
+                                        <option value="paid">Paid option only (e.g. bowl)</option>
+                                        <option value="both">Customer chooses free or paid</option>
+                                    </select>
+                                    <div class="form-text text-muted">Prices and option names are set on the store's edit page.</div>
+                                </div>
+                            </div>
                         </fieldset>
                         <fieldset class="food_delivery_div d-none">
                             <legend>{{ trans('lang.ingredients') }}</legend>
@@ -302,6 +315,7 @@
         var digital_product_file = '';
         var digital_product_file_name = '';
         var digital_product_old_file = '';
+        var itemNeedsPack = true;
         var digital_product_ext = '';
         var productImagesCount = 0;
         var vendors = [];
@@ -543,6 +557,10 @@
                 if (product.takeawayOption) {
                     $(".item_take_away_option").prop('checked', true);
                 }
+                // Dishes not set up since packaging became per dish stay on the
+                // store default until an option is picked.
+                itemNeedsPack = product.needs_pack !== false;
+                $("#item_pack_option").val(['none', 'free', 'paid', 'both'].includes(product.pack_option) ? product.pack_option : (itemNeedsPack ? '' : 'none'));
                 if (product.hasOwnProperty("isDigitalProduct") && product.hasOwnProperty("digitalProduct")) {
                     if (product.isDigitalProduct) {
                         $("#is_digital_product").prop('checked', true);
@@ -821,12 +839,16 @@
                                 'addOnsTitle': addOnesTitle,
                                 'addOnsPrice': addOnesPrice,
                                 'takeawayOption': itemTakeaway,
+                                'needs_pack': $("#item_pack_option").val() ? $("#item_pack_option").val() !== 'none' : itemNeedsPack,
                                 'product_specification': product_specification,
                                 'item_attribute': item_attribute,
                                 'photos': IMG,
                                 'isDigitalProduct': is_digital_product,
                                 'digitalProduct': DigitalImg ? DigitalImg : '',
                             };
+                            if ($("#item_pack_option").val()) {
+                                objects['pack_option'] = $("#item_pack_option").val();
+                            }
                             database.collection('vendor_products').doc(vendor_id).update(objects).then(function(result) {
                                 <?php if (isset($_GET['eid']) && $_GET['eid'] != '') { ?>
                                     window.location.href = "{{ route('vendors.items', $_GET['eid']) }}";

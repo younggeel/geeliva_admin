@@ -231,6 +231,8 @@ async function getCustomerRefund(orderData) {
         totalPrice+=parseFloat(totalTax);
         totalPrice += parseFloat(orderData.deliveryCharge || 0);
         totalPrice+=parseFloat(orderData.tip_amount||0);
+        // Paid bowls and the pack, set by the store at checkout.
+        totalPrice += parseFloat(orderData.deliveryPackCharge || 0);
         const customerDoc = await firestore.collection('users').doc(customerId).get();
         if (customerDoc.exists) {
             const customerData = customerDoc.data();
