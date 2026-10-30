@@ -36,10 +36,11 @@ class PasswordResetController extends Controller
         $ipLimitKey = 'pwreset-ip:' . $request->ip();
         // Rate-limited *before* revealing anything -- don't let the response differ
         // based on whether the limiter tripped, that itself would leak information.
-        if (RateLimiter::tooManyAttempts($emailLimitKey, 3) || RateLimiter::tooManyAttempts($ipLimitKey, 10)) {
+        // First send + 3 resends per 30 minutes, matching the apps' "Resend code" limit.
+        if (RateLimiter::tooManyAttempts($emailLimitKey, 4) || RateLimiter::tooManyAttempts($ipLimitKey, 10)) {
             return $genericResponse;
         }
-        RateLimiter::hit($emailLimitKey, 3600);
+        RateLimiter::hit($emailLimitKey, 1800);
         RateLimiter::hit($ipLimitKey, 3600);
 
         $uid = $this->identity->lookupUidByEmail($email);
@@ -80,7 +81,8 @@ class PasswordResetController extends Controller
             return response()->json(['success' => false, 'message' => 'Account not found.'], 404);
         }
 
-        if (!$this->identity->updatePassword($uid, $request->input('newPassword'))) {
+        // The code was delivered to this inbox, which proves ownership of the address.
+        if (!$this->identity->updatePassword($uid, $request->input('newPassword'), markEmailVerified: true)) {
             return response()->json(['success' => false, 'message' => 'Could not update password, please try again.'], 500);
         }
 

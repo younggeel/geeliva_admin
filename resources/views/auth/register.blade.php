@@ -1276,7 +1276,7 @@
                 'otherDetails': otherDetails,
             };
 
-            firebase.auth().createUserWithEmailAndPassword(email, password)
+            createAuthUserKeepingAdmin(email, password)
                 .then(function (firebaseUser) {
                     user_id = firebaseUser.user.uid;
                     database.collection('users').doc(user_id).set({

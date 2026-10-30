@@ -17,6 +17,7 @@
         </div>
     </div>
     <div class="container-fluid">
+        @include('partials.staff_access_warning')
        
        <div class="admin-top-section"> 
         <div class="row">

@@ -355,7 +355,7 @@ foreach ($countries as $keycountry => $valuecountry) {
                         var subscriptionData=null;
                     }
 
-                    firebase.auth().createUserWithEmailAndPassword(email, password)
+                    createAuthUserKeepingAdmin(email, password)
                         .then(function (firebaseUser) {
                             user_id = firebaseUser.user.uid;
                             storeImageData().then(IMG => {

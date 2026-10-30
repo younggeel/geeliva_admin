@@ -16,6 +16,7 @@
         </div>
 
     </div>
+    <div class="container-fluid">@include('partials.staff_access_warning')</div>
 
     <div class="profile-form">
 

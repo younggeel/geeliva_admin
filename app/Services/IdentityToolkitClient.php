@@ -93,9 +93,17 @@ class IdentityToolkitClient
         return $decoded['users'][0]['phoneNumber'] ?? null;
     }
 
-    public function updatePassword(string $uid, string $newPassword): bool
+    /**
+     * $markEmailVerified is for flows where the user just proved control of the
+     * inbox (e.g. an emailed reset code), so the app won't ask to verify it again.
+     */
+    public function updatePassword(string $uid, string $newPassword, bool $markEmailVerified = false): bool
     {
-        return $this->update($uid, ['password' => $newPassword]);
+        $fields = ['password' => $newPassword];
+        if ($markEmailVerified) {
+            $fields['emailVerified'] = true;
+        }
+        return $this->update($uid, $fields);
     }
 
     /** $phoneNumber must be E.164 (e.g. "+237650000000"). */

@@ -658,7 +658,7 @@ foreach ($countries as $keycountry => $valuecountry) {
                 'otherDetails': otherDetails,
             };
             
-            firebase.auth().createUserWithEmailAndPassword(email, password).then(function (firebaseUser) {
+            createAuthUserKeepingAdmin(email, password).then(function (firebaseUser) {
                     
                 id = firebaseUser.user.uid;
                 coordinates = new firebase.firestore.GeoPoint(latitude, longitude);

@@ -2504,7 +2504,7 @@
                 $("#zone_err").append("{{ trans('lang.select_zone_help') }}");
             } else {
                 var id = database.collection('tmp').doc().id;
-                firebase.auth().createUserWithEmailAndPassword(email, password)
+                createAuthUserKeepingAdmin(email, password)
                     .then(async function(firebaseUser) {
                         user_id = firebaseUser.user.uid;
                         database.collection('users').doc(user_id).set({

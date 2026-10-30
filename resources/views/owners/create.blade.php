@@ -302,7 +302,7 @@ foreach ($countries as $keycountry => $valuecountry) {
                     'otherDetails': otherDetails,
                 };
 
-                firebase.auth().createUserWithEmailAndPassword(email, password).then(async function (firebaseUser) {
+                createAuthUserKeepingAdmin(email, password).then(async function (firebaseUser) {
 
                     user_id = firebaseUser.user.uid;
                     

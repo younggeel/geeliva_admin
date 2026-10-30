@@ -911,7 +911,7 @@
                     window.scrollTo(0, 0);
                 } else {
                     jQuery("#data-table_processing").show();
-                    firebase.auth().createUserWithEmailAndPassword(email, password).then(async function(firebaseUser) {
+                    createAuthUserKeepingAdmin(email, password).then(async function(firebaseUser) {
                         var user_id = firebaseUser.user.uid;
                         userData.email = email;
                         userData.firstName = userFirstName;

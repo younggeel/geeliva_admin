@@ -447,8 +447,8 @@
                 : null;
 
             const [ordersCurrSnap, ordersLastSnap] = await Promise.all([
-                ordersQuery.get(),
-                ordersLastQuery ? ordersLastQuery.get() : Promise.resolve({ docs: [] })
+                dashboardEarningsDocs('vendor_orders', active_id, filterType ? startTS : null, filterType ? endTS : null, ordersQuery),
+                ordersLastQuery ? dashboardEarningsDocs('vendor_orders', active_id, startLastTS, endLastTS, ordersLastQuery) : Promise.resolve({ docs: [] })
             ]);
 
             let totalEarning = 0, adminCommission = 0;
@@ -753,17 +753,12 @@
             };
 
             const promises = Object.entries(statuses).map(([key, statusArray]) => {
-                let query = db.collection('vendor_orders')
-                    .where('status', 'in', statusArray)
-                    // .where('vendor.section_id', '==', active_id);
-                    .where('section_id', '==', active_id);
-
+                const where = [['status', 'in', statusArray], ['section_id', '==', active_id]];
                 if (startTS && endTS) {
-                    query = query.where('createdAt', '>=', startTS)
-                        .where('createdAt', '<=', endTS);
+                    where.push(['createdAt', '>=', startTS], ['createdAt', '<=', endTS]);
                 }
 
-                return query.get().then(snapshot => ({ key, count: snapshot.docs.length }));
+                return countQuery('vendor_orders', where).then(snapshot => ({ key, count: snapshot.docs.length }));
             });
 
             const results = await Promise.all(promises);
@@ -1311,18 +1306,18 @@
 
             Promise.all([
                 // All-time
-                db.collection('vendor_orders').where('section_id', '==', active_id).orderBy('createdAt').get(),
-                db.collection('users').where("role", "==", "customer").orderBy("createdAt").get(),
+                countQuery('vendor_orders', [['section_id', '==', active_id]]),
+                countQuery('users', [["role", "==", "customer"]]),
                 db.collection('vendors').where('section_id', '==', active_id).get(),
 
                 // Current period
-                db.collection('vendor_orders').where('section_id', '==', active_id).where('createdAt', '>=', startThisTS).where('createdAt', '<=', endThisTS).orderBy('createdAt').get(),
-                db.collection('users').where("role", "==", "customer").where('createdAt', '>=', startThisTS).where('createdAt', '<=', endThisTS).orderBy("createdAt").get(),
+                countQuery('vendor_orders', [['section_id', '==', active_id], ['createdAt', '>=', startThisTS], ['createdAt', '<=', endThisTS]]),
+                countQuery('users', [["role", "==", "customer"], ['createdAt', '>=', startThisTS], ['createdAt', '<=', endThisTS]]),
                 db.collection('vendors').where('section_id', '==', active_id).where('createdAt', '>=', startThisTS).where('createdAt', '<=', endThisTS).get(),
 
                 // Last period
-                startLastTS ? db.collection('vendor_orders').where('section_id', '==', active_id).where('createdAt', '>=', startLastTS).where('createdAt', '<=', endLastTS).orderBy('createdAt').get() : Promise.resolve({ docs: [] }),
-                startLastTS ? db.collection('users').where("role", "==", "customer").where('createdAt', '>=', startLastTS).where('createdAt', '<=', endLastTS).orderBy("createdAt").get() : Promise.resolve({ docs: [] }),
+                startLastTS ? countQuery('vendor_orders', [['section_id', '==', active_id], ['createdAt', '>=', startLastTS], ['createdAt', '<=', endLastTS]]) : Promise.resolve({ docs: [] }),
+                startLastTS ? countQuery('users', [["role", "==", "customer"], ['createdAt', '>=', startLastTS], ['createdAt', '<=', endLastTS]]) : Promise.resolve({ docs: [] }),
                 startLastTS ? db.collection('vendors').where('section_id', '==', active_id).where('createdAt', '>=', startLastTS).where('createdAt', '<=', endLastTS).get() : Promise.resolve({ docs: [] })
             ])
                 .then(([allOrders, allUsers, allVendors,

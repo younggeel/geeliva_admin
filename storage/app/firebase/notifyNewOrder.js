@@ -72,12 +72,27 @@ async function notifyAdminsOfNewOrder(order) {
         orderId: order.id,
         click_url: '/index.php',
     };
+    // High-priority, sticky, vibrating system notification so the phone plays its
+    // notification sound even with the browser in the background. Keep in sync with
+    // admin2/src/Fcm.php::adminAlertWebpush (which admin2's "Test alert" button uses).
+    const webpush = {
+        headers: { Urgency: 'high', TTL: '3600' },
+        notification: {
+            icon: '/assets/icons/icon-192.png',
+            badge: '/assets/icons/icon-192.png',
+            tag: `order-${order.id}`,
+            renotify: true,
+            requireInteraction: true,
+            silent: false,
+            vibrate: [500, 200, 500, 200, 500, 200, 500],
+        },
+    };
 
     await Promise.all(tokensSnapshot.docs.map(async (tokenDoc) => {
         const token = tokenDoc.data()?.fcmToken;
         if (!token) return;
         try {
-            await messaging.send({ notification, data, token });
+            await messaging.send({ notification, data, webpush, token });
         } catch (err) {
             console.error(`Failed to notify admin token ${tokenDoc.id}:`, err.message);
         }

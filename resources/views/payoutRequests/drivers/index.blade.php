@@ -280,6 +280,20 @@
 
                             </div>
 
+                            <div class="form-group row width-100">
+                                <label class="col-12 control-label">MTN MoMo</label>
+                                <div class="col-12">
+                                    <input type="text" class="form-control" id="mtnMomoDetails" readonly>
+                                </div>
+                            </div>
+
+                            <div class="form-group row width-100">
+                                <label class="col-12 control-label">Orange Money</label>
+                                <div class="col-12">
+                                    <input type="text" class="form-control" id="orangeMoneyDetails" readonly>
+                                </div>
+                            </div>
+
 
 
                         </div>
@@ -1267,6 +1281,18 @@
 
             }
 
+        });
+
+        // Drivers are paid by hand to the mobile money numbers they saved in the app.
+        $('#mtnMomoDetails, #orangeMoneyDetails').val('');
+        await database.collection('withdraw_method').where("userId", "==", driverId).get().then(function (snapshot) {
+            if (!snapshot.docs.length) return;
+            var method = snapshot.docs[0].data();
+            var describe = function (account) {
+                return account && account.phoneNumber ? account.accountName + ' - ' + account.phoneNumber : '';
+            };
+            $('#mtnMomoDetails').val(describe(method.mtnMomo));
+            $('#orangeMoneyDetails').val(describe(method.orangeMoney));
         });
 
     }

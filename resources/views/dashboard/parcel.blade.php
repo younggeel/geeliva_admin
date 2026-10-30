@@ -588,7 +588,7 @@
             }
             ordersQuery = ordersQuery.orderBy('createdAt', 'desc');
 
-            const snapshot = await ordersQuery.get();
+            const snapshot = await dashboardEarningsDocs('parcel_orders', active_id, startTS || null, endTS || null, ordersQuery);
 
             snapshot.docs.forEach(doc => {
                 const orderData = doc.data();
@@ -659,7 +659,7 @@
                     .where('createdAt', '>=', prevStartTS)
                     .where('createdAt', '<=', prevEndTS);
 
-                const prevSnapshot = await prevQuery.get();
+                const prevSnapshot = await dashboardEarningsDocs('parcel_orders', active_id, prevStartTS, prevEndTS, prevQuery);
 
                 prevSnapshot.docs.forEach(doc => {
                     const d = doc.data();
@@ -789,14 +789,12 @@
                 cancelled: ["Order Cancelled"],
             };
             const promises = Object.entries(statuses).map(([key, statusArray]) => {
-                let query = db.collection('parcel_orders').where('sectionId', '==' , active_id)
-                    .where('status', 'in', statusArray);
+                const where = [['sectionId', '==', active_id], ['status', 'in', statusArray]];
                 if (startTS && endTS) {
-                    query = query.where('createdAt', '>=', startTS)
-                        .where('createdAt', '<=', endTS);
+                    where.push(['createdAt', '>=', startTS], ['createdAt', '<=', endTS]);
                 }
 
-                return query.get().then(snapshot => ({ key, count: snapshot.docs.length }));
+                return countQuery('parcel_orders', where).then(snapshot => ({ key, count: snapshot.docs.length }));
             });
 
             const results = await Promise.all(promises);
@@ -934,19 +932,19 @@
 
             Promise.all([
                 // All-time
-                db.collection('parcel_orders').where('sectionId', '==' , active_id).get(),
-                db.collection('users').where("role", "==", "customer").orderBy("createdAt").get(),
-                db.collection('users').where("role", "==", "driver").where('sectionId', '==', active_id).where('isOwner','==',false).orderBy("createdAt",'desc').get(),
+                countQuery('parcel_orders', [['sectionId', '==', active_id]]),
+                countQuery('users', [["role", "==", "customer"]]),
+                countQuery('users', [["role", "==", "driver"], ['sectionId', '==', active_id], ['isOwner', '==', false]]),
 
                 // Current period
-                db.collection('parcel_orders').where('sectionId', '==' , active_id).where('createdAt', '>=', startThisTS).where('createdAt', '<=', endThisTS).get(),
-                db.collection('users').where("role", "==", "customer").where('createdAt', '>=', startThisTS).where('createdAt', '<=', endThisTS).orderBy("createdAt").get(),
-                db.collection('users').where("role", "==", "driver").where('sectionId', '==', active_id).where('isOwner','==',false).where('createdAt', '>=', startThisTS).where('createdAt', '<=', endThisTS).orderBy("createdAt",'desc').get(),
+                countQuery('parcel_orders', [['sectionId', '==', active_id], ['createdAt', '>=', startThisTS], ['createdAt', '<=', endThisTS]]),
+                countQuery('users', [["role", "==", "customer"], ['createdAt', '>=', startThisTS], ['createdAt', '<=', endThisTS]]),
+                countQuery('users', [["role", "==", "driver"], ['sectionId', '==', active_id], ['isOwner', '==', false], ['createdAt', '>=', startThisTS], ['createdAt', '<=', endThisTS]]),
 
                 // Last period
-                startLastTS ? db.collection('parcel_orders').where('sectionId', '==' , active_id).where('createdAt', '>=', startLastTS).where('createdAt', '<=', endLastTS).get() : Promise.resolve({ docs: [] }),
-                startLastTS ? db.collection('users').where("role", "==", "customer").where('createdAt', '>=', startLastTS).where('createdAt', '<=', endLastTS).orderBy("createdAt").get() : Promise.resolve({ docs: [] }),
-                startLastTS ? db.collection('users').where("role", "==", "driver").where('sectionId', '==', active_id).where('isOwner','==',false).where('createdAt', '>=', startLastTS).where('createdAt', '<=', endLastTS).orderBy("createdAt",'desc').get() : Promise.resolve({ docs: [] }),
+                startLastTS ? countQuery('parcel_orders', [['sectionId', '==', active_id], ['createdAt', '>=', startLastTS], ['createdAt', '<=', endLastTS]]) : Promise.resolve({ docs: [] }),
+                startLastTS ? countQuery('users', [["role", "==", "customer"], ['createdAt', '>=', startLastTS], ['createdAt', '<=', endLastTS]]) : Promise.resolve({ docs: [] }),
+                startLastTS ? countQuery('users', [["role", "==", "driver"], ['sectionId', '==', active_id], ['isOwner', '==', false], ['createdAt', '>=', startLastTS], ['createdAt', '<=', endLastTS]]) : Promise.resolve({ docs: [] }),
             ])
                 .then(([allOrders, allUsers, allDrivers,
                     ordersCurr, usersCurr, driversCurr,

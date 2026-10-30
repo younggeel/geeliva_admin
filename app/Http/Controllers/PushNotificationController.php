@@ -45,6 +45,20 @@ class PushNotificationController extends Controller
         }
         RateLimiter::hit($rateLimitKey, 60);
 
+        // No legitimate flow (order placed, gift order, cart-share paid, chat message,
+        // etc.) ever sends more than one or two notifications to the same recipient in
+        // quick succession. This is deliberately NOT a full sender->recipient
+        // authorization check -- this endpoint is shared by the vendor and driver apps
+        // too, and building that matrix blind risks breaking a legitimate flow this
+        // repo can't see. This just caps how many times any one sender can hit the same
+        // target, which is enough to blunt spam/flooding of a specific victim without
+        // touching any real usage pattern.
+        $targetRateLimitKey = 'push-send-target:' . $uid . ':' . substr(hash('sha256', $request->input('fcm_token')), 0, 16);
+        if (RateLimiter::tooManyAttempts($targetRateLimitKey, 5)) {
+            return response()->json(['success' => false, 'message' => 'Too many notifications to this recipient, slow down'], 429);
+        }
+        RateLimiter::hit($targetRateLimitKey, 600);
+
         if (!Storage::disk('local')->has('firebase/credentials.json')) {
             return response()->json(['success' => false, 'message' => 'Server misconfigured'], 500);
         }
@@ -62,6 +76,13 @@ class PushNotificationController extends Controller
             $accessToken = $client->getAccessToken()['access_token'] ?? null;
             if (empty($accessToken)) {
                 return response()->json(['success' => false, 'message' => 'Unable to obtain send credentials'], 500);
+            }
+
+            // Customers reach other customers only through the notifyCustomer
+            // function, which checks for a real gift or cart-share link. This
+            // stops anyone with a customer account pushing to arbitrary people.
+            if ($this->isCustomerToCustomer($uid, $request->input('fcm_token'), $projectId)) {
+                return response()->json(['success' => false, 'message' => 'Not allowed'], 403);
             }
 
             $payload = [
@@ -112,5 +133,31 @@ class PushNotificationController extends Controller
     {
         $result = $this->adminBridge->run('verifyFirebaseToken.js', ['idToken' => $idToken]);
         return $result['uid'] ?? null;
+    }
+
+    private function isCustomerToCustomer(string $senderUid, string $fcmToken, string $projectId): bool
+    {
+        $client = new Google_Client();
+        $client->setAuthConfig(storage_path('app/firebase/credentials.json'));
+        $client->addScope('https://www.googleapis.com/auth/datastore');
+        $token = $client->fetchAccessTokenWithAssertion()['access_token'] ?? null;
+        if (empty($token)) {
+            return false;
+        }
+        $http = new \GuzzleHttp\Client(['timeout' => 10, 'http_errors' => false, 'headers' => ['Authorization' => 'Bearer ' . $token]]);
+        $base = "https://firestore.googleapis.com/v1/projects/{$projectId}/databases/(default)/documents";
+
+        $sender = json_decode((string) $http->get("{$base}/users/" . rawurlencode($senderUid) . '?mask.fieldPaths=role')->getBody(), true);
+        if (($sender['fields']['role']['stringValue'] ?? null) !== 'customer') {
+            return false;
+        }
+
+        $rows = json_decode((string) $http->post("{$base}:runQuery", ['json' => ['structuredQuery' => [
+            'from' => [['collectionId' => 'users']],
+            'where' => ['fieldFilter' => ['field' => ['fieldPath' => 'fcmToken'], 'op' => 'EQUAL', 'value' => ['stringValue' => $fcmToken]]],
+            'select' => ['fields' => [['fieldPath' => 'role']]],
+            'limit' => 1,
+        ]]])->getBody(), true);
+        return ($rows[0]['document']['fields']['role']['stringValue'] ?? null) === 'customer';
     }
 }

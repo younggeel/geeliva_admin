@@ -307,7 +307,7 @@ foreach ($countries as $keycountry => $valuecountry) {
             var id = database.collection('tmp').doc().id;
             await storeImageData().then(async (IMG) => {
 
-                firebase.auth().createUserWithEmailAndPassword(email, password)
+                createAuthUserKeepingAdmin(email, password)
                     .then(async function(firebaseUser) {
                         user_id = firebaseUser.user.uid;
                         database.collection('users').doc(user_id).set({

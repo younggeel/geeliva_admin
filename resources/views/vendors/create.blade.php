@@ -365,7 +365,7 @@ foreach ($countries as $keycountry => $valuecountry) {
             };
 
            
-            firebase.auth().createUserWithEmailAndPassword(email, password)
+            createAuthUserKeepingAdmin(email, password)
                 .then(async function (firebaseUser) {
                     user_id = firebaseUser.user.uid;
                     await storeImageData().then(async (IMG) => {

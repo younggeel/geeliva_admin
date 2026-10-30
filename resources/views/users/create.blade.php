@@ -230,7 +230,7 @@ foreach ($countries as $keycountry => $valuecountry) {
         } else {
             jQuery("#data-table_processing").show();
  
-            firebase.auth().createUserWithEmailAndPassword(email, password)
+            createAuthUserKeepingAdmin(email, password)
                 .then(function (firebaseUser) {
                     var user_id = firebaseUser.user.uid;
                     storeImageData().then(IMG => {

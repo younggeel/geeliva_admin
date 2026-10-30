@@ -593,6 +593,7 @@ Route::middleware(['permission:cms,cms.create'])->group(function () {
 });
 Route::post('/firebase/config', [App\Http\Controllers\FirebaseController::class, 'config'])->name('firebase.config');
 Route::get('/firebase/admin-token', [App\Http\Controllers\FirebaseController::class, 'adminToken'])->name('firebase.admin-token');
+Route::post('/dashboard/count', [App\Http\Controllers\DashboardCountController::class, 'count'])->name('dashboard.count');
 Route::middleware(['permission:dynamic-notifications,dynamic-notification.index'])->group(function () {
     Route::get('dynamic-notification', [App\Http\Controllers\DynamicNotificationController::class, 'index'])->name('dynamic-notification.index');
 });
