@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirebaseAdminBridge;
+use App\Services\FirebaseTokenVerifier;
 use App\Services\FirestoreClient;
 use App\Services\IdentityToolkitClient;
 use Illuminate\Http\Request;
@@ -20,7 +20,7 @@ class PhoneVerificationController extends Controller
     private const VERIFIED_PHONES_COLLECTION = 'verified_phones';
 
     public function __construct(
-        private FirebaseAdminBridge $adminBridge,
+        private FirebaseTokenVerifier $tokenVerifier,
         private IdentityToolkitClient $identity,
         private FirestoreClient $firestore
     ) {
@@ -30,8 +30,7 @@ class PhoneVerificationController extends Controller
     {
         $request->validate(['id_token' => 'required|string']);
 
-        $result = $this->adminBridge->run('verifyFirebaseToken.js', ['idToken' => $request->input('id_token')]);
-        $uid = $result['uid'] ?? null;
+        $uid = $this->tokenVerifier->uid($request->input('id_token'));
         if ($uid === null) {
             return response()->json(['success' => false, 'message' => 'Invalid or expired credentials'], 401);
         }

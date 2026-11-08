@@ -119,6 +119,23 @@
               </div>
             </div>
 
+            <div class="form-group row width-50">
+                <label class="col-3 control-label">Applies to</label>
+                <div class="col-7">
+                  <select id="coupon_applies_to" class="form-control">
+                    <option value="items">Items (food / products)</option>
+                    <option value="delivery">Delivery fee only</option>
+                  </select>
+                  <div class="form-text text-muted">A delivery coupon only reduces the delivery fee; the driver is still paid in full.</div>
+                </div>
+              </div>
+              <div class="form-group row width-100">
+                <div class="form-check">
+                  <input type="checkbox" class="coupon_one_time" id="coupon_one_time">
+                  <label class="col-3 control-label" for="coupon_one_time">One time use per customer</label>
+                </div>
+              </div>
+
           </fieldset>
         </div>
 
@@ -177,6 +194,9 @@
       ref.get().then(async function (snapshots) {
         var coupon = snapshots.docs[0].data();
 
+        // A coupon for every store in this service has no store.
+        $('#vendor_vendor_select').append($("<option></option>").attr("value", "__all__").attr("sectionId", section_id)
+          .prop('selected', !coupon.vendorID).text('All stores in this service'));
         await database.collection('vendors').where('section_id', '==', section_id).get().then(async function (snapshots) {
 
           snapshots.docs.forEach((listval) => {
@@ -219,6 +239,8 @@
         if (coupon.isPublic) {
           $(".coupon_public").prop("checked", true);
         }
+        $("#coupon_applies_to").val(coupon.appliesTo == 'delivery' ? 'delivery' : 'items');
+        $(".coupon_one_time").prop("checked", coupon.oneTimeUse === true);
 
         if (coupon.hasOwnProperty("expiresAt")) {
 
@@ -272,6 +294,11 @@
         if (sectionId == undefined) {
           sectionId = '';
         }
+        var appliesTo = $("#coupon_applies_to").val() || 'items';
+        var oneTimeUse = $(".coupon_one_time").is(":checked");
+        if (vendorID == '__all__') {
+          vendorID = '';
+        }
 
         var codeAlreadyExist = false;
 
@@ -317,7 +344,7 @@
               } else {
                   jQuery("#data-table_processing").show();
                   storeImageData().then(IMG => {
-                      database.collection('coupons').doc(id).update({ 'code': code, 'description': description, 'discount': discount, 'expiresAt': expiresAt, 'isEnabled': isEnabled, 'id': id, 'discountType': discountType, 'image': IMG, 'vendorID': vendorID, 'section_id': sectionId, 'isPublic': isPublic }).then(function (result) {
+                      database.collection('coupons').doc(id).update({ 'code': code, 'description': description, 'discount': discount, 'expiresAt': expiresAt, 'isEnabled': isEnabled, 'id': id, 'discountType': discountType, 'image': IMG, 'vendorID': vendorID, 'section_id': sectionId, 'isPublic': isPublic, 'appliesTo': appliesTo, 'oneTimeUse': oneTimeUse }).then(function (result) {
 
                           <?php if (isset($_GET['eid']) && $_GET['eid'] != '') { ?>
 

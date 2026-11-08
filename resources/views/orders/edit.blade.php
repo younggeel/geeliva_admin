@@ -1134,7 +1134,12 @@
 
                 if (service_type != undefined && service_type != '' && service_type == "delivery-service") {
                     if (order.status == "Order Accepted" || order.status == "Driver Pending") {
-                        $("#order_status").prop("disabled", true);
+                        // The store and the drivers move the order on from here; an
+                        // admin may still cancel it (a stuck order kept alerting drivers).
+                        $("#order_status option").each(function () {
+                            var keep = this.value == order.status || this.value == 'Order Cancelled';
+                            $(this).prop('disabled', !keep).toggle(keep);
+                        });
                     }
                 }
 
@@ -2239,6 +2244,17 @@
                 }
             }
 
+            // A delivery coupon reduces what the customer paid for delivery; the
+            // driver is still paid the full fee.
+            var deliveryDiscount = parseFloat(snapshotsProducts.deliveryDiscount || 0);
+            if (deliveryDiscount > 0) {
+                totalAmount -= deliveryDiscount;
+                var deliveryDiscount_val = currencyAtRight
+                    ? deliveryDiscount.toFixed(decimal_degits) + "" + currentCurrency
+                    : currentCurrency + "" + deliveryDiscount.toFixed(decimal_degits);
+                html = html + '<tr><td class="label">Delivery coupon</td><td class="deliveryCharge" style="color:red">(-' + deliveryDiscount_val + ')</td></tr>';
+            }
+
             if (intRegex.test(tip_amount) || floatRegex.test(tip_amount)) {
                 html = html + '<tr><td class="seprater" colspan="2"><hr><span>{{ trans('lang.tip') }}</span></td></tr>';
 
@@ -2617,31 +2633,48 @@
                         deliveryCharge = parseFloat(orderData.deliveryCharge || 0);
                         tipAmount = parseFloat(orderData.tip_amount || 0);
                         customerAmount = parseFloat(deliveryCharge) + parseFloat(tipAmount) + parseFloat(vendorAmount) + parseFloat(adminCommissionValue);
+                        customerAmount -= parseFloat(orderData.deliveryDiscount || 0); // delivery coupon
 
                         const customerDoc = await database.collection('users').doc(customerId).get();
                         if (customerDoc.exists) {
-                            const customerData = customerDoc.data();
-                            customerFcm = customerData.fcmToken || '';
-                            const customerWallet = parseFloat(customerData.wallet_amount || 0);
-                            const finalWalletAmount = parseFloat((customerWallet + customerAmount).toFixed(2));
-                            await customerDoc.ref.update({
-                                wallet_amount: finalWalletAmount
-                            });
+                            customerFcm = customerDoc.data().fcmToken || '';
                         }
 
-                        const walletId = database.collection("tmp").doc().id;
-                        await database.collection('wallet').doc(walletId).set({
-                            amount: customerAmount,
-                            date: firebase.firestore.FieldValue.serverTimestamp(),
-                            id: walletId,
-                            isTopUp: true,
-                            order_id: orderData.id,
-                            payment_method: "Wallet",
-                            payment_status: 'success',
-                            user_id: customerId,
-                            transactionUser: 'customer',
-                            note: 'Order amount refunded'
-                        });
+                        // Not paid automatically: the refund waits on the Refunds page.
+                        const refundRef = database.collection('refund_requests').doc('admin_cancelled_' + orderData.id);
+                        const existingRefund = await refundRef.get();
+                        if (!existingRefund.exists && customerAmount > 0) {
+                            const author = orderData.author || {};
+                            await refundRef.set({
+                                id: refundRef.id,
+                                orderId: orderData.id,
+                                orderCollection: 'vendor_orders',
+                                reason: 'admin_cancelled',
+                                status: 'pending',
+                                amount: parseFloat(customerAmount.toFixed(2)),
+                                paymentMethod: orderData.payment_method || orderData.paymentMethod || '',
+                                customerId: customerId,
+                                customerName: ((author.firstName || '') + ' ' + (author.lastName || '')).trim(),
+                                customerPhone: (author.countryCode || '') + (author.phoneNumber || ''),
+                                vendorId: orderData.vendorID || '',
+                                vendorName: (orderData.vendor && orderData.vendor.title) || '',
+                                sectionId: orderData.section_id || orderData.sectionId || '',
+                                createdBy: 'admin',
+                                createdByRole: 'admin',
+                                createdAt: firebase.firestore.Timestamp.now()
+                            });
+                            await $.ajax({
+                                type: 'POST',
+                                url: "<?php echo route('order-status-notification'); ?>",
+                                data: {
+                                    _token: '<?php echo csrf_token(); ?>',
+                                    'fcm': customerFcm,
+                                    'orderStatus': 'refund',
+                                    'subject': 'Refund pending',
+                                    'message': 'Your order was cancelled. Your refund is pending: we will review it manually and notify you once it is refunded.'
+                                }
+                            });
+                        }
                         
                     } else {
                         const customerDoc = await database.collection('users').doc(customerId).get();
@@ -2650,6 +2683,12 @@
                         }
                     }
                     
+                    // Take the order off any driver it is still being offered to.
+                    const offeredTo = await database.collection('users').where('orderRequestData', 'array-contains', orderData.id).get();
+                    for (const offered of offeredTo.docs) {
+                        await offered.ref.update({ orderRequestData: firebase.firestore.FieldValue.arrayRemove(orderData.id) });
+                    }
+
                     if (orderData.hasOwnProperty('driverID') && orderData.driverID != null && orderData.driverID != '') {
                         await database.collection('users').doc(orderData.driverID).get().then(async function(snapshot) {
                             let newOrderRequestData = [];

@@ -13,7 +13,14 @@ use Illuminate\Support\Facades\Storage;
  */
 class FirestoreClient
 {
+    private ?string $cachedToken = null;
+
     private function accessToken(): ?string
+    {
+        return $this->cachedToken ??= $this->mintAccessToken();
+    }
+
+    private function mintAccessToken(): ?string
     {
         if (!Storage::disk('local')->has('firebase/credentials.json')) {
             return null;
@@ -80,6 +87,92 @@ class FirestoreClient
         curl_close($ch);
 
         return $result !== false && $httpCode === 200;
+    }
+
+    /** Updates only the given fields, leaving the rest of the document as it is. */
+    public function merge(string $collection, string $docId, array $fields): bool
+    {
+        $mask = implode('&', array_map(fn ($key) => 'updateMask.fieldPaths=' . rawurlencode($key), array_keys($fields)));
+        [$httpCode] = $this->request('PATCH', "/{$collection}/" . rawurlencode($docId) . "?{$mask}", ['fields' => $this->wrap($fields)]);
+
+        return $httpCode === 200;
+    }
+
+    /** True/false when known, null when Firestore couldn't be reached -- unlike get(), which returns null for both. */
+    public function exists(string $collection, string $docId): ?bool
+    {
+        [$httpCode] = $this->request('GET', "/{$collection}/" . rawurlencode($docId) . '?mask.fieldPaths=uid');
+
+        return match ($httpCode) {
+            200 => true,
+            404 => false,
+            default => null,
+        };
+    }
+
+    /** Atomic create: true if created, false if already there, null when Firestore couldn't be reached. */
+    public function create(string $collection, string $docId, array $fields): ?bool
+    {
+        [$httpCode] = $this->request(
+            'PATCH',
+            "/{$collection}/" . rawurlencode($docId) . '?currentDocument.exists=false',
+            ['fields' => $this->wrap($fields)]
+        );
+
+        if ($httpCode === 200) {
+            return true;
+        }
+
+        return in_array($httpCode, [400, 409, 412], true) ? false : null;
+    }
+
+    /** Whether any document has $field == $value; null when Firestore couldn't be reached. */
+    public function anyWhere(string $collection, string $field, string $value): ?bool
+    {
+        [$httpCode, $rows] = $this->request('POST', ':runQuery', ['structuredQuery' => [
+            'from' => [['collectionId' => $collection]],
+            'where' => ['fieldFilter' => [
+                'field' => ['fieldPath' => $field],
+                'op' => 'EQUAL',
+                'value' => ['stringValue' => $value],
+            ]],
+            'limit' => 1,
+        ]]);
+
+        if ($httpCode !== 200 || !is_array($rows)) {
+            return null;
+        }
+        foreach ($rows as $row) {
+            if (isset($row['document'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return array{0: int, 1: mixed} http status (0 when unreachable) and decoded body */
+    private function request(string $method, string $path, ?array $body = null): array
+    {
+        $token = $this->accessToken();
+        $base = $this->baseUrl();
+        if (!$token || !$base) {
+            return [0, null];
+        }
+
+        $ch = curl_init($base . $path);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $token, 'Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        if ($body !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+        }
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return $result === false ? [0, null] : [$httpCode, json_decode($result, true)];
     }
 
     public function delete(string $collection, string $docId): void

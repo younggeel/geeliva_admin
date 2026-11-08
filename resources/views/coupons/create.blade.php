@@ -81,6 +81,7 @@
                   <div class="col-7">
                     <select id="vendor_vendor_select" class="form-control">
                       <option value="">{{trans('lang.select_vendor')}}</option>
+                      <option value="__all__">All stores in this service</option>
                     </select>
                     <div class="form-text text-muted">
                       {{ trans("lang.coupon_vendor_id_help") }}
@@ -117,6 +118,23 @@
                 <div class="form-check">
                   <input type="checkbox" class="coupon_public" id="coupon_public">
                   <label class="col-3 control-label" for="coupon_public">{{trans('lang.coupon_public')}}</label>
+                </div>
+              </div>
+
+              <div class="form-group row width-50">
+                <label class="col-3 control-label">Applies to</label>
+                <div class="col-7">
+                  <select id="coupon_applies_to" class="form-control">
+                    <option value="items">Items (food / products)</option>
+                    <option value="delivery">Delivery fee only</option>
+                  </select>
+                  <div class="form-text text-muted">A delivery coupon only reduces the delivery fee; the driver is still paid in full.</div>
+                </div>
+              </div>
+              <div class="form-group row width-100">
+                <div class="form-check">
+                  <input type="checkbox" class="coupon_one_time" id="coupon_one_time">
+                  <label class="col-3 control-label" for="coupon_one_time">One time use per customer</label>
                 </div>
               </div>
 
@@ -210,6 +228,8 @@
       var isEnabled = $(".coupon_enabled").is(":checked");
       var discountType = $("#coupon_discount_type").val();
       var isPublic = $(".coupon_public").is(":checked");
+      var appliesTo = $("#coupon_applies_to").val() || 'items';
+      var oneTimeUse = $(".coupon_one_time").is(":checked");
       var codeAlreadyExist = false;
 
       database.collection('coupons').where('code', '==', code).get().then(async function (snapshot) {
@@ -254,6 +274,11 @@
             } else {
                 var id = database.collection("tmp").doc().id;
                 jQuery("#data-table_processing").show();
+                // "All stores in this service": no store, the current section.
+                if (vendorID == '__all__') {
+                    vendorID = '';
+                    sectionId = section_id;
+                }
 
                 storeImageData().then(IMG => {
                     database.collection('coupons').doc(id).set({
@@ -268,6 +293,8 @@
                         'vendorID': vendorID,
                         'section_id': sectionId,
                         'isPublic':isPublic,
+                        'appliesTo': appliesTo,
+                        'oneTimeUse': oneTimeUse,
                         'createdAt': firebase.firestore.FieldValue.serverTimestamp()
                     }).then(function(result) {
                         if (resturant) {

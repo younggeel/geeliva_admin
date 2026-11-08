@@ -303,6 +303,10 @@ Route::middleware(['permission:wallet-transaction,wallet-transaction'])->group(f
 Route::middleware(['permission:wallet-transaction,wallet-transaction'])->group(function () {
     Route::get('/walletstransaction/{id}', [App\Http\Controllers\TransactionController::class, 'index'])->name('users.walletstransaction');
 });
+// Refund requests: pending refunds an admin moves to the wallet, marks paid by Mobile Money, or declines.
+Route::middleware(['permission:orders,orders'])->group(function () {
+    Route::get('/refunds', [App\Http\Controllers\RefundController::class, 'index'])->name('refunds');
+});
 Route::post('order-status-notification', [App\Http\Controllers\OrderController::class, 'sendNotification'])->name('order-status-notification');
 
 Route::middleware(['permission:god-eye,map'])->group(function () {

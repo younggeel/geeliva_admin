@@ -69,6 +69,40 @@ class IdentityToolkitClient
         return $this->lookup('phoneNumber', $phoneNumber);
     }
 
+    /**
+     * The account's Firebase-Auth phone and email, or null when the lookup itself
+     * failed -- so callers can tell "no phone on this account" from "couldn't check".
+     *
+     * @return array{phone: ?string, email: ?string}|null
+     */
+    public function getAccount(string $uid): ?array
+    {
+        $token = $this->accessToken();
+        $projectId = $this->projectId();
+        if (!$token || !$projectId) {
+            return null;
+        }
+
+        $ch = curl_init("https://identitytoolkit.googleapis.com/v1/projects/{$projectId}/accounts:lookup");
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $token, 'Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['localId' => [$uid], 'targetProjectId' => $projectId]));
+        $result = curl_exec($ch);
+        curl_close($ch);
+        if ($result === false) {
+            return null;
+        }
+
+        $user = json_decode($result, true)['users'][0] ?? null;
+        if ($user === null) {
+            return null;
+        }
+
+        return ['phone' => $user['phoneNumber'] ?? null, 'email' => $user['email'] ?? null];
+    }
+
     /** Returns the Firebase-Auth-verified phone number on this account, if any. */
     public function getPhoneNumberByUid(string $uid): ?string
     {

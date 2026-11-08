@@ -703,6 +703,16 @@ $service_type = @$_COOKIE['service_type'];
         @endif
         @endif
 
+        {{-- Refunds wait here for an admin: none is paid automatically. --}}
+        @if (in_array('orders', $role_has_permission))
+            <li class="nav-subtitle"><span class="nav-subtitle-span">Refunds</span></li>
+            <li><a class="waves-effect waves-dark" href="{!! url('refunds') !!}" aria-expanded="false">
+                    <i class="ri-refund-2-line"></i>
+                    <span class="hide-menu">Refunds <span class="badge badge-warning ml-1 d-none" id="refund_pending_badge"></span></span>
+                </a>
+            </li>
+        @endif
+
         @if (
         in_array('payout-request-vendor', $role_has_permission) ||
         in_array('drivers-payout', $role_has_permission) ||
@@ -772,3 +782,33 @@ $service_type = @$_COOKIE['service_type'];
         }
     }
 </script>
+
+@if (in_array('orders', $role_has_permission))
+<script>
+    // Pending refunds: a count next to "Refunds" on every page, and a banner on
+    // the dashboard. Refunds are never paid automatically, so an admin has to
+    // review each one.
+    window.addEventListener('load', function () {
+        if (typeof firebase === 'undefined' || !firebase.firestore) return;
+        firebase.firestore().collection('refund_requests').where('status', '==', 'pending').onSnapshot(function (snap) {
+            var count = snap.size, total = 0;
+            snap.forEach(function (d) { total += parseFloat(d.data().amount) || 0; });
+            var badge = document.getElementById('refund_pending_badge');
+            if (badge) { badge.textContent = count; badge.classList.toggle('d-none', count === 0); }
+            if (window.location.pathname.indexOf('/dashboard') !== 0) return;
+            var old = document.getElementById('refund_pending_banner');
+            if (old) old.remove();
+            if (count === 0) return;
+            var wrap = document.querySelector('.page-wrapper');
+            if (!wrap) return;
+            var banner = document.createElement('div');
+            banner.id = 'refund_pending_banner';
+            banner.className = 'alert alert-warning d-flex justify-content-between align-items-center m-3';
+            banner.innerHTML = '<span><strong>' + count + ' refund' + (count === 1 ? '' : 's') + ' waiting for review</strong> (' +
+                total.toFixed(0) + ' FCFA). Nothing is paid until an admin approves it.</span>' +
+                '<a class="btn btn-sm btn-warning" href="{{ url('refunds') }}">Review refunds</a>';
+            wrap.insertBefore(banner, wrap.firstChild);
+        }, function (error) { console.warn('Refund count unavailable', error); });
+    });
+</script>
+@endif

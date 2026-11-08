@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\FirebaseAdminBridge;
+use App\Services\FirebaseTokenVerifier;
 use Google\Client as Google_Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class PushNotificationController extends Controller
 {
-    public function __construct(private FirebaseAdminBridge $adminBridge)
+    public function __construct(private FirebaseTokenVerifier $tokenVerifier)
     {
     }
 
@@ -126,13 +126,12 @@ class PushNotificationController extends Controller
     }
 
     /**
-     * Verifies a Firebase Auth ID token via FirebaseAdminBridge, rather than trusting
+     * Verifies a Firebase Auth ID token server-side, rather than trusting
      * anything the client claims about itself. Returns the verified uid, or null.
      */
     private function verifyFirebaseIdToken(string $idToken): ?string
     {
-        $result = $this->adminBridge->run('verifyFirebaseToken.js', ['idToken' => $idToken]);
-        return $result['uid'] ?? null;
+        return $this->tokenVerifier->uid($idToken);
     }
 
     private function isCustomerToCustomer(string $senderUid, string $fcmToken, string $projectId): bool
